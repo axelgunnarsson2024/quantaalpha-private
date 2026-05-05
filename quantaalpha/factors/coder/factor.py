@@ -140,7 +140,8 @@ class FactorFBWorkspace(FBWorkspace):
 
             # Use absolute path
             if not source_data_path.is_absolute():
-                source_data_path = self.workspace_path.parent.parent.parent / source_data_path
+                project_root = Path(__file__).resolve().parent.parent.parent.parent
+                source_data_path = project_root / source_data_path
             else:
                 source_data_path = Path(source_data_path).absolute()
 

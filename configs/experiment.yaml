@@ -28,7 +28,7 @@ planning:
 # ============================================================
 execution:
   # Max loop iterations; multiplied by steps_per_loop to get step_n when step_n not set
-  max_loops: 2
+  max_loops: 3
   # Steps per loop: fixed at 5 (propose/construct/calculate/backtest/feedback)
   steps_per_loop: 5
   # Total steps (highest priority); overrides max_loops * steps_per_loop when set

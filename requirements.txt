@@ -57,3 +57,11 @@ setuptools-scm             # Dynamic version from SCM
 rdagent==0.8.0             # RD-Agent framework (pinned for compatibility)
 
 pyqlib                     # Qlib quantitative research framework
+
+# -----------------------------------------------------------------------------
+# Paper trading
+# -----------------------------------------------------------------------------
+yfinance>=0.2.40           # US market OHLCV data
+alpaca-py>=0.25            # Alpaca paper trading API
+lightgbm>=4.0              # Gradient boosting model
+joblib                     # Model serialization

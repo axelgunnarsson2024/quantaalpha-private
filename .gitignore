@@ -127,3 +127,11 @@ release-notes.md
 
 # ---- Sphinx documentation ----
 docs/_build/
+
+# ---- Paper trading runtime files ----
+paper_trading/model.pkl
+paper_trading/positions.json
+paper_trading/trades.csv
+paper_trading/pnl.db
+paper_trading/sp500_tickers.json
+paper_trading/run.log

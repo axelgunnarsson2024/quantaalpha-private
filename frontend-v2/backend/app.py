@@ -206,22 +206,24 @@ async def _run_mining(task_id: str, req: MiningStartRequest):
             
         env["FACTOR_LIBRARY_SUFFIX"] = req.librarySuffix
 
-        results_base = dotenv.get("DATA_RESULTS_DIR", str(PROJECT_ROOT / "data" / "results"))
+        results_base = str((PROJECT_ROOT / dotenv.get("DATA_RESULTS_DIR", "data/results")).resolve())
         env["WORKSPACE_PATH"] = f"{results_base}/workspace_{experiment_id}"
         env["PICKLE_CACHE_FOLDER_PATH_STR"] = f"{results_base}/pickle_cache_{experiment_id}"
 
         os.makedirs(env["WORKSPACE_PATH"], exist_ok=True)
         os.makedirs(env["PICKLE_CACHE_FOLDER_PATH_STR"], exist_ok=True)
 
-        # Qlib symlink
+        # Qlib symlink — only create/update if cn_data is a symlink (not a real directory)
         qlib_data = dotenv.get("QLIB_DATA_DIR", "")
         if qlib_data:
             qlib_symlink_dir = Path.home() / ".qlib" / "qlib_data"
             qlib_symlink_dir.mkdir(parents=True, exist_ok=True)
             cn_data_link = qlib_symlink_dir / "cn_data"
-            if not cn_data_link.exists() or os.readlink(str(cn_data_link)) != qlib_data:
-                if cn_data_link.is_symlink():
+            if cn_data_link.is_symlink():
+                if os.readlink(str(cn_data_link)) != qlib_data:
                     cn_data_link.unlink()
+                    cn_data_link.symlink_to(qlib_data)
+            elif not cn_data_link.exists():
                 cn_data_link.symlink_to(qlib_data)
 
         # Build a temporary config with frontend parameter overrides

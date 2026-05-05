@@ -842,7 +842,7 @@ class APIBackend:
             kwargs = dict(
                 model=model,
                 messages=messages,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_tokens,
                 temperature=temperature,
                 stream=self.chat_stream,
                 seed=self.chat_seed,
