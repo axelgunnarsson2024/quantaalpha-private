@@ -1,291 +1,293 @@
-# Quanta Alpha 量化因子挖掘实验说明
+# Quanta Alpha — Quantitative Factor Mining Experiment Guide
 
-## 目录
-- [1. 项目概述](#1-项目概述)
-- [2. 实验思路与方法论](#2-实验思路与方法论)
-- [3. 主实验流程详解](#3-主实验流程详解)
-- [4. 独立回测框架](#4-独立回测框架)
-- [5. 评价指标详解](#5-评价指标详解)
-- [6. 实验配置与超参数](#6-实验配置与超参数)
-- [7. 数据与回测设置](#7-数据与回测设置)
-- [8. 实验结论与分析](#8-实验结论与分析)
+## Table of Contents
+- [1. Project Overview](#1-project-overview)
+- [2. Methodology](#2-methodology)
+- [3. Main Experiment Walkthrough](#3-main-experiment-walkthrough)
+- [4. Standalone Backtest Framework](#4-standalone-backtest-framework)
+- [5. Evaluation Metrics](#5-evaluation-metrics)
+- [6. Experiment Configuration & Hyperparameters](#6-experiment-configuration--hyperparameters)
+- [7. Data & Backtest Settings](#7-data--backtest-settings)
+- [8. Conclusions & Analysis](#8-conclusions--analysis)
 
 ---
 
-## 1. 项目概述
+## 1. Project Overview
 
-### 1.1 项目目标
+### 1.1 Goals
 
-**Quanta Alpha** 是一个基于大语言模型（LLM）驱动的量化因子自动挖掘系统。其核心目标是：
+**Quanta Alpha** is an LLM-driven system for automated quantitative factor discovery. Core objectives:
 
-- **自动化因子发现**：利用 LLM 生成市场假设，并将假设转化为可计算的因子表达式
-- **进化式优化**：通过变异（Mutation）和交叉（Crossover）操作，迭代优化因子质量
-- **端到端回测验证**：基于 Qlib 框架进行因子回测，评估因子的预测能力和投资价值
+- **Automated factor discovery**: use LLMs to generate market hypotheses and translate them into computable factor expressions
+- **Evolutionary optimization**: iteratively improve factor quality via Mutation and Crossover operations
+- **End-to-end backtest validation**: evaluate factor predictive power and investment value using the Qlib framework
 
-### 1.2 系统架构
+### 1.2 System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                   Quanta Alpha 系统架构                       │
+│                   Quanta Alpha System Architecture              │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│   用户输入（探索方向）                                              │
+│   User Input (exploration direction)                             │
 │         │                                                        │
 │         ▼                                                        │
 │   ┌──────────────┐                                               │
-│   │   Planning   │ ──→ 生成 N 个并行探索方向                        │
+│   │   Planning   │ ──→ Generate N parallel exploration directions │
 │   └──────────────┘                                               │
 │         │                                                        │
 │         ▼                                                        │
 │   ┌──────────────────────────────────────────────────────────┐  │
 │   │              Evolution Controller                         │  │
 │   │  ┌──────────┐  ┌──────────┐  ┌──────────┐               │  │
-│   │  │ Original │→│ Mutation │→│ Crossover│→ 循环...        │  │
-│   │  │   原始轮  │  │   变异轮  │  │   交叉轮  │               │  │
+│   │  │ Original │→│ Mutation │→│ Crossover│→ repeat...      │  │
 │   │  └──────────┘  └──────────┘  └──────────┘               │  │
 │   └──────────────────────────────────────────────────────────┘  │
 │         │                                                        │
 │         ▼                                                        │
 │   ┌──────────────────────────────────────────────────────────┐  │
-│   │           QuantAgentLoop（5 步循环）                       │  │
-│   │  1. factor_propose    → LLM 生成市场假设                   │  │
-│   │  2. factor_construct  → LLM 生成因子表达式                  │  │
-│   │  3. factor_calculate  → 解析并计算因子值                    │  │
-│   │  4. factor_backtest   → Qlib 回测                         │  │
-│   │  5. feedback          → LLM 分析反馈 + 因子入库             │  │
+│   │           QuantAgentLoop (5-step cycle)                   │  │
+│   │  1. factor_propose    → LLM generates market hypothesis   │  │
+│   │  2. factor_construct  → LLM generates factor expressions  │  │
+│   │  3. factor_calculate  → parse and compute factor values   │  │
+│   │  4. factor_backtest   → Qlib backtest                     │  │
+│   │  5. feedback          → LLM analysis + write to library   │  │
 │   └──────────────────────────────────────────────────────────┘  │
 │         │                                                        │
 │         ▼                                                        │
 │   ┌──────────────┐                                               │
-│   │  因子库 JSON  │ ──→ 所有有效因子的归档                         │
+│   │ Factor Library│ ──→ archive of all valid factors             │
+│   │    JSON       │                                              │
 │   └──────────────┘                                               │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.3 核心文件结构
+### 1.3 Key Files
 
-| 文件/脚本 | 功能说明 |
+| File / Script | Purpose |
 |-----------|----------|
-| `运行实验.sh` | 主实验入口脚本，激活环境并调用 `alphaagent mine` |
-| `backtest_v2/run_backtest.py` | 独立回测工具，对因子库进行批量回测 |
-| `run_config.yaml` | 主实验配置文件（规划、进化、回测参数） |
-| `backtest_v2/config.yaml` | 独立回测配置文件 |
-| `all_factors_library_*.json` | 因子库输出文件 |
+| `run_experiment.sh` | Main entry script — activates the environment and calls `alphaagent mine` |
+| `backtest_v2/run_backtest.py` | Standalone backtest tool for batch evaluation of the factor library |
+| `run_config.yaml` | Main experiment config (planning, evolution, backtest parameters) |
+| `backtest_v2/config.yaml` | Standalone backtest config |
+| `all_factors_library_*.json` | Factor library output files |
 
 ---
 
-## 2. 实验思路与方法论
+## 2. Methodology
 
-### 2.1 核心方法：LLM 驱动的进化式因子挖掘
+### 2.1 Core Method: LLM-Driven Evolutionary Factor Mining
 
-传统因子挖掘依赖人工经验和领域知识，效率低且难以规模化。Quanta Alpha 采用创新的方法：
+Traditional factor mining relies on manual expertise and domain knowledge, which is inefficient and hard to scale. Quanta Alpha takes an innovative approach:
 
-#### 2.1.1 假设驱动
+#### 2.1.1 Hypothesis-Driven
 
 ```
-用户输入（如"动量策略"）
+User Input (e.g., "momentum strategy")
         │
         ▼
    ┌─────────────────────────────────────────┐
-   │  LLM 生成市场假设                         │
-   │  例如：                                   │
-   │  "过去N天收益率的动量效应在A股市场显著，    │
-   │   短期动量可能反转而中期动量持续有效"       │
+   │  LLM generates a market hypothesis       │
+   │  Example:                                │
+   │  "The momentum effect of past-N-day      │
+   │   returns is significant in A-shares;    │
+   │   short-term momentum may reverse while  │
+   │   medium-term momentum persists"         │
    └─────────────────────────────────────────┘
         │
         ▼
    ┌─────────────────────────────────────────┐
-   │  LLM 将假设转化为因子表达式               │
-   │  例如：                                   │
+   │  LLM translates hypothesis into factor   │
+   │  expressions, e.g.:                      │
    │  ($close - Ref($close, 5)) / Ref($close, 5)  │
    │  Rank(Mean($close/Ref($close,1)-1, 20))      │
    └─────────────────────────────────────────┘
 ```
 
-#### 2.1.2 进化式优化
+#### 2.1.2 Evolutionary Optimization
 
-借鉴遗传算法思想，通过 **变异** 和 **交叉** 操作优化因子：
+Borrowing from genetic algorithms, factors are improved via **mutation** and **crossover**:
 
 ```
              ┌─────────────────────────────────────────────┐
-             │            进化流程                          │
+             │            Evolution Flow                    │
              ├─────────────────────────────────────────────┤
              │                                             │
-  Round 0    │   原始轮：N 个方向并行探索                     │
-  (Original) │   → 生成 N 条初始轨迹                        │
+  Round 0    │   Original: N directions explored in        │
+  (Original) │   parallel → generate N initial trajectories│
              │                                             │
              │              │                              │
              │              ▼                              │
              │                                             │
-  Round 1    │   变异轮：对原始轨迹进行"变异"                 │
-  (Mutation) │   → 基于原始轨迹生成正交策略                  │
-             │   → 避免重复探索相同路径                      │
+  Round 1    │   Mutation: "mutate" existing trajectories  │
+  (Mutation) │   → generate orthogonal strategies          │
+             │   → avoid re-exploring the same paths       │
              │                                             │
              │              │                              │
              │              ▼                              │
              │                                             │
-  Round 2    │   交叉轮：选择 K 个父代组合                   │
-  (Crossover)│   → 融合不同轨迹的优点                       │
-             │   → 生成新的混合策略                         │
+  Round 2    │   Crossover: select K parent trajectories   │
+  (Crossover)│   → combine advantages of different traces  │
+             │   → produce new hybrid strategies           │
              │                                             │
              │              │                              │
              │              ▼                              │
              │                                             │
-  Round 3+   │   继续 变异 → 交叉 → 变异 → ...              │
-             │   直到达到最大轮数                           │
+  Round 3+   │   Continue: Mutation → Crossover → ...      │
+             │   until maximum rounds reached              │
              │                                             │
              └─────────────────────────────────────────────┘
 ```
 
-### 2.2 方法论优势
+### 2.2 Methodology Advantages
 
-| 优势 | 说明 |
+| Advantage | Description |
 |------|------|
-| **可解释性** | LLM 生成的因子带有假设说明，便于理解因子逻辑 |
-| **多样性** | 进化机制确保因子多样化，避免局部最优 |
-| **自动化** | 全流程自动化，减少人工干预 |
-| **迭代优化** | 反馈机制让系统从失败中学习，持续改进 |
+| **Interpretability** | LLM-generated factors come with hypothesis explanations, making factor logic transparent |
+| **Diversity** | Evolutionary mechanism ensures factor diversity and avoids local optima |
+| **Automation** | Fully automated pipeline with minimal manual intervention |
+| **Iterative improvement** | Feedback mechanism lets the system learn from failures and continuously improve |
 
 ---
 
-## 3. 主实验流程详解
+## 3. Main Experiment Walkthrough
 
-### 3.1 启动命令
+### 3.1 Launch Commands
 
 ```bash
-# 基本用法
-./运行实验.sh "你的探索方向描述"
+# Basic usage
+./run_experiment.sh "your exploration direction"
 
-# 示例
-./运行实验.sh "基于量价关系的短期反转因子"
-./运行实验.sh "利用波动率和成交量构建市场情绪因子"
+# Examples
+./run_experiment.sh "short-term reversal factors based on price-volume relationships"
+./run_experiment.sh "market sentiment factors using volatility and trading volume"
 ```
 
-### 3.2 五步循环详解
+### 3.2 The 5-Step Cycle
 
-每一轮探索包含 5 个核心步骤：
+Each round of exploration consists of 5 core steps:
 
-#### Step 1: factor_propose（假设生成）
-- **输入**：探索方向 + 历史轨迹（trace）
-- **过程**：调用 LLM 生成市场假设
-- **输出**：结构化的假设描述（hypothesis）
-- **核心模块**：`QuantAgentHypothesisGen`
+#### Step 1: factor_propose (Hypothesis Generation)
+- **Input**: exploration direction + historical trajectory (trace)
+- **Process**: call LLM to generate a market hypothesis
+- **Output**: structured hypothesis description
+- **Core module**: `QuantAgentHypothesisGen`
 
 ```python
-# 伪代码示例
+# Pseudo-code
 hypothesis = llm.generate(
     prompt="""
-    根据以下探索方向，生成一个可验证的市场假设：
-    方向：{direction}
-    历史经验：{trace.history}
+    Given the following exploration direction, generate a testable market hypothesis:
+    Direction: {direction}
+    Historical experience: {trace.history}
     
-    请描述：
-    1. 假设的核心逻辑
-    2. 预期的市场现象
-    3. 可能的验证方法
+    Describe:
+    1. Core logic of the hypothesis
+    2. Expected market phenomenon
+    3. Possible validation methods
     """
 )
 ```
 
-#### Step 2: factor_construct（因子构建）
-- **输入**：市场假设
-- **过程**：LLM 将假设转化为 2-3 个因子表达式
-- **输出**：因子表达式列表
-- **核心模块**：`QuantAgentHypothesis2FactorExpression`
+#### Step 2: factor_construct (Factor Construction)
+- **Input**: market hypothesis
+- **Process**: LLM translates hypothesis into 2–3 factor expressions
+- **Output**: list of factor expressions
+- **Core module**: `QuantAgentHypothesis2FactorExpression`
 
 ```
-# 因子表达式语法示例
-$close                          # 收盘价
-Ref($close, 5)                  # 5天前的收盘价
-Mean($volume, 20)               # 20日均量
-Rank($close / Ref($close, 1) - 1)  # 日收益率排名
-Std($close / Ref($close, 1) - 1, 20)  # 20日收益率标准差
+# Factor expression syntax examples
+$close                          # Close price
+Ref($close, 5)                  # Close price 5 days ago
+Mean($volume, 20)               # 20-day average volume
+Rank($close / Ref($close, 1) - 1)  # Daily return rank
+Std($close / Ref($close, 1) - 1, 20)  # 20-day return std dev
 ```
 
-#### Step 3: factor_calculate（因子计算）
-- **输入**：因子表达式
-- **过程**：解析表达式并计算因子值
-- **输出**：因子值矩阵（时间 × 股票）
-- **核心模块**：`QlibFactorParser`
+#### Step 3: factor_calculate (Factor Computation)
+- **Input**: factor expressions
+- **Process**: parse expressions and compute factor values
+- **Output**: factor value matrix (time × stocks)
+- **Core module**: `QlibFactorParser`
 
-##### 3.1 计算流程概览
+##### 3.1 Computation Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                     因子计算流程                                          │
+│                     Factor Computation Pipeline                          │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│   因子表达式输入                                                          │
-│   例: "RANK(DELTA($close, 5) / TS_STD($close, 20))"                     │
+│   Factor expression input                                                │
+│   e.g.: "RANK(DELTA($close, 5) / TS_STD($close, 20))"                  │
 │         │                                                                │
 │         ▼                                                                │
 │   ┌──────────────────────────────────────────────────────────────────┐  │
-│   │  1. 表达式预处理 (expr_parser.py)                                  │  │
-│   │     - 括号平衡检查                                                  │  │
-│   │     - 无效运算符检查                                                │  │
-│   │     - 一元负号预处理 (如 "* -$close" → "* (-1 * $close)")          │  │
+│   │  1. Expression pre-processing (expr_parser.py)                    │  │
+│   │     - Bracket balance check                                        │  │
+│   │     - Invalid operator check                                       │  │
+│   │     - Unary minus pre-processing ("* -$close" → "* (-1*$close)")  │  │
 │   └──────────────────────────────────────────────────────────────────┘  │
 │         │                                                                │
 │         ▼                                                                │
 │   ┌──────────────────────────────────────────────────────────────────┐  │
-│   │  2. 表达式解析 (pyparsing 库)                                      │  │
-│   │     - 构建 AST (抽象语法树)                                         │  │
-│   │     - 运算符优先级: * / → + - → > < >= <= == != → && → ||          │  │
-│   │     - 将中缀表达式转换为函数调用形式                                  │  │
-│   │       例: "$close + $open" → "ADD($close, $open)"                  │  │
+│   │  2. Expression parsing (pyparsing library)                         │  │
+│   │     - Build AST (abstract syntax tree)                             │  │
+│   │     - Operator precedence: * / → + - → > < >= <= == != → && → ||  │  │
+│   │     - Convert infix to function-call form                          │  │
+│   │       e.g.: "$close + $open" → "ADD($close, $open)"               │  │
 │   └──────────────────────────────────────────────────────────────────┘  │
 │         │                                                                │
 │         ▼                                                                │
 │   ┌──────────────────────────────────────────────────────────────────┐  │
-│   │  3. 因子验证 (factor_regulator.py)                                 │  │
-│   │     - 可解析性检查                                                  │  │
-│   │     - 重复子树检测 (与已有因子库对比)                                 │  │
-│   │     - 复杂度约束:                                                   │  │
-│   │       · 符号长度 (SL) ≤ 300                                        │  │
-│   │       · 基础特征数 (ER) ≤ 6                                         │  │
-│   │       · 自由参数比例 < 50%                                          │  │
+│   │  3. Factor validation (factor_regulator.py)                        │  │
+│   │     - Parseability check                                            │  │
+│   │     - Duplicate subtree detection (vs existing factor library)      │  │
+│   │     - Complexity constraints:                                        │  │
+│   │       · Symbol Length (SL) ≤ 300                                   │  │
+│   │       · Base Feature Count (ER) ≤ 6                                │  │
+│   │       · Free parameter ratio < 50%                                  │  │
 │   └──────────────────────────────────────────────────────────────────┘  │
 │         │                                                                │
 │         ▼                                                                │
 │   ┌──────────────────────────────────────────────────────────────────┐  │
-│   │  4. 加载市场数据 (Qlib)                                            │  │
-│   │     - 数据源: daily_pv.h5 (日线数据)                                │  │
-│   │     - 包含: $open, $high, $low, $close, $volume                    │  │
-│   │     - 索引: MultiIndex (instrument, datetime)                      │  │
+│   │  4. Load market data (Qlib)                                        │  │
+│   │     - Data source: daily_pv.h5 (daily bar data)                    │  │
+│   │     - Contains: $open, $high, $low, $close, $volume                │  │
+│   │     - Index: MultiIndex (instrument, datetime)                      │  │
 │   └──────────────────────────────────────────────────────────────────┘  │
 │         │                                                                │
 │         ▼                                                                │
 │   ┌──────────────────────────────────────────────────────────────────┐  │
-│   │  5. 递归计算因子值 (function_lib.py)                               │  │
-│   │     - 变量替换: "$close" → "df['$close']"                          │  │
-│   │     - 使用 eval() 执行解析后的表达式                                 │  │
-│   │     - 所有函数自动处理 groupby('instrument') 分组                   │  │
+│   │  5. Recursive factor computation (function_lib.py)                 │  │
+│   │     - Variable substitution: "$close" → "df['$close']"             │  │
+│   │     - Execute parsed expression via eval()                          │  │
+│   │     - All functions automatically apply groupby('instrument')       │  │
 │   └──────────────────────────────────────────────────────────────────┘  │
 │         │                                                                │
 │         ▼                                                                │
 │   ┌──────────────────────────────────────────────────────────────────┐  │
-│   │  6. 结果输出与缓存                                                  │  │
-│   │     - 输出: result.h5 (HDF5 格式)                                  │  │
-│   │     - 索引: MultiIndex (instrument, datetime)                      │  │
-│   │     - 数据类型: float64                                            │  │
+│   │  6. Result output & caching                                        │  │
+│   │     - Output: result.h5 (HDF5 format)                              │  │
+│   │     - Index: MultiIndex (instrument, datetime)                      │  │
+│   │     - dtype: float64                                                │  │
 │   └──────────────────────────────────────────────────────────────────┘  │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-##### 3.2 表达式解析器实现
+##### 3.2 Expression Parser Implementation
 
-表达式解析器基于 **pyparsing** 库实现，支持完整的算术、比较、逻辑和条件表达式：
+The expression parser is built on **pyparsing** and supports arithmetic, comparison, logical, and conditional expressions:
 
 ```python
-# 核心解析逻辑 (expr_parser.py)
+# Core parsing logic (expr_parser.py)
 
-# 1. 定义基本元素
-var = Combine(Optional("$") + Word(alphas, alphanums + "_"))  # 变量: $close, volume
-number = Regex(r"[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?")   # 数字: 1.5, -3, 1e-8
+# 1. Define basic elements
+var = Combine(Optional("$") + Word(alphas, alphanums + "_"))  # variables: $close, volume
+number = Regex(r"[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?")   # numbers: 1.5, -3, 1e-8
 
-# 2. 定义运算符优先级（从低到高）
+# 2. Define operator precedence (low to high)
 expr = infixNotation(operand, [
     (mul_div,      2, LEFT,  parse_arith_op),      # * /
     (add_minus,    2, LEFT,  parse_arith_op),      # + -
@@ -295,165 +297,165 @@ expr = infixNotation(operand, [
     (conditional,  3, RIGHT, parse_conditional)     # ? :
 ])
 
-# 3. 运算符转换为函数调用
-# 例如: "$close + $open"  →  "ADD($close, $open)"
+# 3. Operators converted to function calls
+# e.g.: "$close + $open"  →  "ADD($close, $open)"
 #       "$close > $open"  →  "GT($close, $open)"
 #       "A ? B : C"       →  "WHERE(A, B, C)"
 ```
 
-##### 3.3 支持的因子函数库
+##### 3.3 Supported Factor Function Library
 
-系统内置了丰富的因子计算函数（`function_lib.py`），分为以下几类：
+The system ships a rich set of built-in functions (`function_lib.py`):
 
-**时间序列函数（TS_*）**- 按股票分组，沿时间轴计算
+**Time-series functions (TS_*)** — grouped by instrument, computed along the time axis
 
-| 函数 | 说明 | 示例 |
+| Function | Description | Example |
 |------|------|------|
-| `DELTA(df, p)` | p 期差分 | `DELTA($close, 5)` 5日收盘价变化 |
-| `DELAY(df, p)` | 延迟 p 期 | `DELAY($close, 1)` 昨日收盘价 |
-| `TS_MEAN(df, p)` | p 期滚动均值 | `TS_MEAN($volume, 20)` 20日均量 |
-| `TS_STD(df, p)` | p 期滚动标准差 | `TS_STD($close, 20)` 20日波动率 |
-| `TS_MAX(df, p)` | p 期滚动最大值 | `TS_MAX($high, 10)` 10日最高价 |
-| `TS_MIN(df, p)` | p 期滚动最小值 | `TS_MIN($low, 10)` 10日最低价 |
-| `TS_RANK(df, p)` | p 期滚动排名 | `TS_RANK($close, 20)` 20日排名 |
-| `TS_CORR(df1, df2, p)` | p 期滚动相关系数 | `TS_CORR($close, $volume, 20)` |
-| `TS_SUM(df, p)` | p 期滚动累加 | `TS_SUM($volume, 5)` 5日成交量 |
-| `TS_ARGMAX(df, p)` | 最大值位置 | `TS_ARGMAX($close, 20)` 最高点距今天数 |
-| `TS_ARGMIN(df, p)` | 最小值位置 | `TS_ARGMIN($close, 20)` 最低点距今天数 |
-| `TS_PCTCHANGE(df, p)` | p 期收益率 | `TS_PCTCHANGE($close, 5)` 5日收益率 |
+| `DELTA(df, p)` | p-period difference | `DELTA($close, 5)` — 5-day close change |
+| `DELAY(df, p)` | Lag by p periods | `DELAY($close, 1)` — yesterday's close |
+| `TS_MEAN(df, p)` | p-period rolling mean | `TS_MEAN($volume, 20)` — 20-day avg volume |
+| `TS_STD(df, p)` | p-period rolling std dev | `TS_STD($close, 20)` — 20-day volatility |
+| `TS_MAX(df, p)` | p-period rolling max | `TS_MAX($high, 10)` — 10-day high |
+| `TS_MIN(df, p)` | p-period rolling min | `TS_MIN($low, 10)` — 10-day low |
+| `TS_RANK(df, p)` | p-period rolling rank | `TS_RANK($close, 20)` — 20-day rank |
+| `TS_CORR(df1, df2, p)` | p-period rolling correlation | `TS_CORR($close, $volume, 20)` |
+| `TS_SUM(df, p)` | p-period rolling sum | `TS_SUM($volume, 5)` — 5-day cumulative volume |
+| `TS_ARGMAX(df, p)` | Position of max value | `TS_ARGMAX($close, 20)` — days since 20-day high |
+| `TS_ARGMIN(df, p)` | Position of min value | `TS_ARGMIN($close, 20)` — days since 20-day low |
+| `TS_PCTCHANGE(df, p)` | p-period return | `TS_PCTCHANGE($close, 5)` — 5-day return |
 
-**横截面函数（CS_*）**- 按日期分组，跨股票计算
+**Cross-sectional functions (CS_*)** — grouped by date, computed across stocks
 
-| 函数 | 说明 | 示例 |
+| Function | Description | Example |
 |------|------|------|
-| `RANK(df)` | 横截面排名（百分比） | `RANK($close)` 收盘价排名 |
-| `ZSCORE(df)` | 横截面标准化 | `ZSCORE($volume)` 成交量Z-Score |
-| `MEAN(df)` | 横截面均值 | `MEAN($close)` 全市场平均价 |
-| `STD(df)` | 横截面标准差 | `STD($close)` 全市场价格离散度 |
-| `SCALE(df)` | 横截面缩放 | `SCALE($close)` 归一化 |
+| `RANK(df)` | Cross-sectional rank (percentile) | `RANK($close)` |
+| `ZSCORE(df)` | Cross-sectional z-score | `ZSCORE($volume)` |
+| `MEAN(df)` | Cross-sectional mean | `MEAN($close)` — market-wide average price |
+| `STD(df)` | Cross-sectional std dev | `STD($close)` — market-wide price dispersion |
+| `SCALE(df)` | Cross-sectional scaling | `SCALE($close)` — normalization |
 
-**数学函数**
+**Math functions**
 
-| 函数 | 说明 | 示例 |
+| Function | Description | Example |
 |------|------|------|
-| `ABS(df)` | 绝对值 | `ABS(DELTA($close, 1))` |
-| `LOG(df)` | 自然对数 | `LOG($volume)` |
-| `SQRT(df)` | 平方根 | `SQRT($volume)` |
-| `SIGN(df)` | 符号函数 | `SIGN(DELTA($close, 1))` |
-| `POW(df, n)` | 幂运算 | `POW($close, 2)` |
-| `EXP(df)` | 指数函数 | `EXP($close / 100)` |
+| `ABS(df)` | Absolute value | `ABS(DELTA($close, 1))` |
+| `LOG(df)` | Natural log | `LOG($volume)` |
+| `SQRT(df)` | Square root | `SQRT($volume)` |
+| `SIGN(df)` | Sign function | `SIGN(DELTA($close, 1))` |
+| `POW(df, n)` | Power | `POW($close, 2)` |
+| `EXP(df)` | Exponential | `EXP($close / 100)` |
 
-**技术指标函数**
+**Technical indicator functions**
 
-| 函数 | 说明 | 示例 |
+| Function | Description | Example |
 |------|------|------|
-| `SMA(df, m)` | 简单移动平均 | `SMA($close, 20)` |
-| `EMA(df, p)` | 指数移动平均 | `EMA($close, 12)` |
-| `WMA(df, p)` | 加权移动平均 | `WMA($close, 10)` |
-| `MACD(price, s, l)` | MACD 指标 | `MACD($close, 12, 26)` |
-| `RSI(price, p)` | 相对强弱指数 | `RSI($close, 14)` |
-| `BB_UPPER/MIDDLE/LOWER` | 布林带 | `BB_UPPER($close, 20)` |
-| `DECAYLINEAR(df, p)` | 线性衰减加权 | `DECAYLINEAR($close, 10)` |
+| `SMA(df, m)` | Simple moving average | `SMA($close, 20)` |
+| `EMA(df, p)` | Exponential moving average | `EMA($close, 12)` |
+| `WMA(df, p)` | Weighted moving average | `WMA($close, 10)` |
+| `MACD(price, s, l)` | MACD indicator | `MACD($close, 12, 26)` |
+| `RSI(price, p)` | Relative strength index | `RSI($close, 14)` |
+| `BB_UPPER/MIDDLE/LOWER` | Bollinger Bands | `BB_UPPER($close, 20)` |
+| `DECAYLINEAR(df, p)` | Linear decay weighting | `DECAYLINEAR($close, 10)` |
 
-**回归函数**
+**Regression functions**
 
-| 函数 | 说明 | 示例 |
+| Function | Description | Example |
 |------|------|------|
-| `REGBETA(y, x, p)` | 滚动回归系数 | `REGBETA($close, $volume, 20)` |
-| `REGRESI(y, x, p)` | 滚动回归残差 | `REGRESI($close, MEAN($close), 20)` |
+| `REGBETA(y, x, p)` | Rolling regression coefficient | `REGBETA($close, $volume, 20)` |
+| `REGRESI(y, x, p)` | Rolling regression residual | `REGRESI($close, MEAN($close), 20)` |
 
-**逻辑与条件函数**
+**Logic & conditional functions**
 
-| 函数 | 说明 | 示例 |
+| Function | Description | Example |
 |------|------|------|
-| `GT(a, b)` | 大于 | `GT($close, $open)` |
-| `LT(a, b)` | 小于 | `LT($close, DELAY($close, 1))` |
-| `AND(a, b)` | 逻辑与 | `AND(GT($close, $open), GT($volume, 1e8))` |
-| `OR(a, b)` | 逻辑或 | `OR(GT($close, $open), LT($low, $open))` |
-| `WHERE(cond, t, f)` | 条件选择 | `WHERE(GT($close, $open), $high, $low)` |
+| `GT(a, b)` | Greater than | `GT($close, $open)` |
+| `LT(a, b)` | Less than | `LT($close, DELAY($close, 1))` |
+| `AND(a, b)` | Logical AND | `AND(GT($close, $open), GT($volume, 1e8))` |
+| `OR(a, b)` | Logical OR | `OR(GT($close, $open), LT($low, $open))` |
+| `WHERE(cond, t, f)` | Conditional selection | `WHERE(GT($close, $open), $high, $low)` |
 
-##### 3.4 因子复杂度正则化
+##### 3.4 Factor Complexity Regularization
 
-为防止因子过于复杂或与已有因子重复，系统实现了复杂度正则化（`FactorRegulator`）：
+To prevent overly complex factors or duplication with existing ones, the system implements complexity regularization (`FactorRegulator`):
 
 ```
-复杂度惩罚: R_g(f, h) = α₁·SL(f) + α₂·PC(f) + α₃·ER(f, h)
+Complexity penalty: R_g(f, h) = α₁·SL(f) + α₂·PC(f) + α₃·ER(f, h)
 
-其中:
-- SL(f): 符号长度 (Symbol Length) - 表达式字符数
-- PC(f): 参数复杂度 (Parameter Complexity) - 自由参数比例
-- ER(f, h): 特征冗余 (Expression Redundancy) - 基础特征数量
+Where:
+- SL(f): Symbol Length — character count of the expression
+- PC(f): Parameter Complexity — ratio of free parameters
+- ER(f, h): Expression Redundancy — number of distinct base features
 ```
 
-**验证规则**：
+**Validation rules**:
 
-| 指标 | 阈值 | 说明 |
+| Metric | Threshold | Description |
 |------|------|------|
-| 符号长度 (SL) | ≤ 300 | 表达式不能太长 |
-| 基础特征数 (ER) | ≤ 6 | 最多使用 6 种原始特征 |
-| 自由参数比例 | < 50% | 数值常量不能占比过高 |
-| 重复子树大小 | ≤ 8 | 与已有因子的重复部分不能太大 |
+| Symbol Length (SL) | ≤ 300 | Expression must not be too long |
+| Base Feature Count (ER) | ≤ 6 | At most 6 distinct raw features |
+| Free parameter ratio | < 50% | Numeric constants must not dominate |
+| Duplicate subtree size | ≤ 8 | Overlap with existing factors must be small |
 
-##### 3.5 计算执行与缓存
+##### 3.5 Computation Execution & Caching
 
-因子计算的最终执行使用 Python 的 `eval()` 函数：
+Final factor computation uses Python's `eval()`:
 
 ```python
-# 计算模板 (template.jinja2)
+# Compute template (template.jinja2)
 def calculate_factor(expr: str, name: str):
-    # 1. 加载数据
+    # 1. Load data
     df = pd.read_hdf('./daily_pv.h5', key='data')
     
-    # 2. 符号替换
+    # 2. Symbol substitution
     expr = parse_symbol(expr, df.columns)   # TRUE → True, $close → close
-    expr = parse_expression(expr)            # 解析为函数调用形式
+    expr = parse_expression(expr)            # parse into function-call form
     
-    # 3. 变量替换
+    # 3. Variable substitution
     for col in df.columns:
         expr = expr.replace(col[1:], f"df['{col}']")  # close → df['$close']
     
-    # 4. 执行计算
-    df[name] = eval(expr)  # 执行解析后的表达式
+    # 4. Execute
+    df[name] = eval(expr)
     result = df[name].astype(np.float64)
     
-    # 5. 保存结果
+    # 5. Save result
     result.to_hdf('result.h5', key='data')
 ```
 
-**缓存机制**：
-- 计算结果保存为 HDF5 格式（`result.h5`）
-- 工作空间路径：`/mnt/DATA/quantagent/QuantaAlpha/QuantaAlpha_workspace/{UUID}/`
-- 独立回测框架可通过缓存提取工具复用这些计算结果
+**Caching**:
+- Results are saved in HDF5 format (`result.h5`)
+- Workspace path: `/mnt/DATA/quantagent/QuantaAlpha/QuantaAlpha_workspace/{UUID}/`
+- The standalone backtest framework can reuse these results via cache extraction tools
 
-#### Step 4: factor_backtest（因子回测）
-- **输入**：计算好的因子值
-- **过程**：基于 Qlib 进行机器学习回测
-- **输出**：回测指标（IC、ICIR、收益率等）
-- **核心模块**：`QlibFactorRunner`
+#### Step 4: factor_backtest (Factor Backtest)
+- **Input**: computed factor values
+- **Process**: ML-based backtest using Qlib
+- **Output**: backtest metrics (IC, ICIR, returns, etc.)
+- **Core module**: `QlibFactorRunner`
 
 ```yaml
-# 主程序回测配置 (conf.yaml)
-训练集: 2016-01-01 ~ 2020-12-31  # 5年
-验证集: 2021-01-01 ~ 2021-12-31  # 1年
-测试集: 2022-01-01 ~ 2025-12-26  # 约4年
+# Main program backtest config (conf.yaml)
+Train:      2016-01-01 ~ 2020-12-31  # 5 years
+Validation: 2021-01-01 ~ 2021-12-31  # 1 year
+Test:       2022-01-01 ~ 2025-12-26  # ~4 years
 
-模型: LightGBM
-策略: TopkDropoutStrategy (Top50, Drop5)
+Model:    LightGBM
+Strategy: TopkDropoutStrategy (Top50, Drop5)
 ```
 
-#### Step 5: feedback（反馈与入库）
-- **输入**：回测结果 + 假设
-- **过程**：LLM 分析结果，生成反馈
-- **输出**：反馈报告 + 因子写入库
-- **核心模块**：`QuantAgentQlibFactorHypothesisExperiment2Feedback`
+#### Step 5: feedback (Feedback & Library Write)
+- **Input**: backtest results + hypothesis
+- **Process**: LLM analyzes results and generates feedback
+- **Output**: feedback report + factor written to library
+- **Core module**: `QuantAgentQlibFactorHypothesisExperiment2Feedback`
 
 ```python
-# 因子入库结构
+# Factor library entry structure
 factor_entry = {
     "factor_name": "momentum_5d",
     "factor_expression": "($close - Ref($close, 5)) / Ref($close, 5)",
-    "hypothesis": "短期动量效应...",
-    "direction": "动量策略",
+    "hypothesis": "Short-term momentum effect...",
+    "direction": "momentum strategy",
     "evolution_phase": "original" | "mutation" | "crossover",
     "metrics": {
         "RankIC": 0.05,
@@ -464,16 +466,16 @@ factor_entry = {
 }
 ```
 
-### 3.3 进化控制器
+### 3.3 Evolution Controller
 
-进化控制器（`EvolutionController`）管理整个进化流程：
+The `EvolutionController` manages the entire evolutionary process:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                  Evolution Controller                        │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│  TrajectoryPool（轨迹池）                                     │
+│  TrajectoryPool                                              │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │ Trajectory 1: direction=0, phase=original, ic=0.03  │   │
 │  │ Trajectory 2: direction=1, phase=original, ic=0.05  │   │
@@ -482,302 +484,361 @@ factor_entry = {
 │  │ ...                                                  │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                                                              │
-│  任务调度逻辑                                                  │
-│  ├─ Original: 为每个 planning 方向创建初始任务                  │
-│  ├─ Mutation: 对每条已有轨迹生成变异任务                        │
-│  └─ Crossover: 选择 K 个父代组合，生成交叉任务                  │
+│  Task scheduling logic                                       │
+│  ├─ Original:  create initial tasks for each planning dir.  │
+│  ├─ Mutation:  generate mutation tasks for each trajectory  │
+│  └─ Crossover: select K parent combos, generate crossovers  │
 │                                                              │
-│  父代选择策略                                                  │
-│  ├─ best: 优先选择表现最好的轨迹                               │
-│  ├─ weighted: 性能加权采样（差的更可能被选中，鼓励探索）          │
-│  └─ random: 随机选择                                          │
+│  Parent selection strategies                                 │
+│  ├─ best:     prioritize best-performing trajectories        │
+│  ├─ weighted: performance-weighted sampling (worse = more    │
+│  │            likely to be selected, encouraging exploration)│
+│  └─ random:   random selection                               │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
-交叉轮评估器的评估机制
-1. 可见的评价指标
-交叉轮评估器可以看到每个轨迹的 7 个指标：
-指标	说明	用途
-IC	信息系数	因子与收益的相关性
-ICIR	IC 信息比率	IC 的稳定性
-RankIC	排名 IC	更稳健的因子相关性指标
-RankICIR	排名 IC 信息比率	RankIC 的稳定性
-annualized_return	年化超额收益率	策略收益能力
-information_ratio	信息比率	风险调整后收益
-max_drawdown	最大回撤	策略风险
-2. 主要评估指标
-当前使用 RankIC 作为主要评估指标（get_primary_metric() 方法）：
-trajectory.pyLines 90-92
-def get_primary_metric(self) -> Optional[float]:    """Get the primary metric (RankIC) for comparison."""    return self.backtest_metrics.get("RankIC")
-3. 评估用于哪些决策
-决策环节	使用方式
-父代选择	根据 parent_selection_strategy 使用 get_primary_metric() (RankIC) 排序或加权
-组合评分	select_crossover_pairs 中根据平均 RankIC 评估组合质量
-多样性偏好	结合 direction_id 多样性 + phase 多样性 + 平均性能综合打分
-4. LLM 可见的轨迹信息
-在生成交叉提示词时，LLM 可以看到：
-### Parent 1: Original Round**Direction ID**: 0**Hypothesis**: 价量因子挖掘...**Factors**:  - ROC60_Factor: RANK(TS_PCTCHANGE($close, 60))...**Metrics**:  - IC: 0.0053  - ICIR: 0.0418  - RankIC: 0.0220  - RankICIR: 0.1789  - annualized_return: 0.068  - information_ratio: 1.12  - max_drawdown: -0.05**Feedback**: The results show...
-5. 评估流程图
-┌─────────────────────────────────────────────────────────────────┐│                    交叉轮评估流程                                │├─────────────────────────────────────────────────────────────────┤│                                                                  ││  1. 候选轨迹池 (来自前几轮)                                       ││     ├── 轨迹A: RankIC=0.22, direction=0, phase=original          ││     ├── 轨迹B: RankIC=0.18, direction=1, phase=original          ││     ├── 轨迹C: RankIC=0.25, direction=0, phase=mutation          ││     └── 轨迹D: RankIC=0.15, direction=1, phase=mutation          ││                                                                  ││  2. 根据 parent_selection_strategy 筛选                          ││     ├── best: 按 RankIC 降序取 Top-N                             ││     ├── weighted: 高 RankIC 权重大                                ││     ├── weighted_inverse: 低 RankIC 权重大（探索）                 ││     └── top_percent_plus_random: 前30%必选 + 随机                 ││                                                                  ││  3. 生成组合并评分                                                ││     ├── 组合1: [A, C] → score = diversity + avg_metric            ││     ├── 组合2: [A, D] → score = ...                               ││     └── ...                                                       ││                                                                  ││  4. 选择 Top-N 组合作为交叉父代                                    ││                                                                  │└─────────────────────────────────────────────────────────────────┘
----
 
-## 4. 独立回测框架
+**Crossover evaluation mechanism**
 
-### 4.1 设计目的
+**1. Visible metrics**
 
-主实验过程中的回测（`factor_backtest`）用于快速评估单个因子。而独立回测框架（`backtest_v2`）用于：
+The crossover evaluator can see 7 metrics per trajectory:
 
-1. **批量评估**：对整个因子库进行统一回测
-2. **长周期验证**：使用更长的测试期（2022-2025）验证因子稳定性
-3. **组合效果**：评估多因子组合的整体表现
-4. **对照实验**：与 Qlib 官方因子库（Alpha158）进行对比
+| Metric | Description | Use |
+|--------|-------------|-----|
+| IC | Information Coefficient | Factor–return correlation |
+| ICIR | IC Information Ratio | IC stability |
+| RankIC | Rank IC | More robust factor correlation |
+| RankICIR | Rank IC Information Ratio | RankIC stability |
+| annualized_return | Annualized excess return | Strategy profitability |
+| information_ratio | Information Ratio | Risk-adjusted return |
+| max_drawdown | Maximum drawdown | Strategy risk |
 
-### 4.2 回测配置
+**2. Primary evaluation metric**
 
-```yaml
-# backtest_v2/config.yaml 关键配置
+`RankIC` is used as the primary metric (`get_primary_metric()` method):
 
-数据配置:
-  数据源: ~/.qlib/qlib_data/cn_data
-  市场: csi300 (沪深300成分股)
-  数据范围: 2016-01-01 ~ 2025-12-26
-
-数据集划分:
-  训练集: 2016-01-01 ~ 2020-12-31  # 模型学习历史规律
-  验证集: 2021-01-01 ~ 2021-12-31  # 模型调参
-  测试集: 2022-01-01 ~ 2025-12-26  # 样本外验证（最终评估）
-
-模型配置:
-  模型类型: LightGBM
-  学习率: 0.1
-  最大深度: 8
-  叶子节点数: 210
-  早停轮数: 50
-  最大迭代: 500
-
-回测策略:
-  策略: TopkDropoutStrategy
-  - topk: 50      # 持有评分最高的50只股票
-  - n_drop: 5     # 每次调仓剔除评分最低的5只
-  
-交易成本:
-  买入: 0.05%
-  卖出: 0.15%
-  最低: 5元
+```python
+def get_primary_metric(self) -> Optional[float]:
+    """Get the primary metric (RankIC) for comparison."""
+    return self.backtest_metrics.get("RankIC")
 ```
 
-### 4.3 使用方式
+**3. Where metrics drive decisions**
+
+| Decision point | How metrics are used |
+|----------------|----------------------|
+| Parent selection | `get_primary_metric()` (RankIC) used for sorting / weighting |
+| Pair scoring | Average RankIC used in `select_crossover_pairs` |
+| Diversity preference | Combines direction diversity + phase diversity + avg performance |
+
+**4. Trajectory information visible to the LLM**
+
+When generating crossover prompts, the LLM sees:
+
+```
+### Parent 1: Original Round
+**Direction ID**: 0
+**Hypothesis**: Price-volume factor mining...
+**Factors**:
+  - ROC60_Factor: RANK(TS_PCTCHANGE($close, 60))...
+**Metrics**:
+  - IC: 0.0053
+  - ICIR: 0.0418
+  - RankIC: 0.0220
+  - RankICIR: 0.1789
+  - annualized_return: 0.068
+  - information_ratio: 1.12
+  - max_drawdown: -0.05
+**Feedback**: The results show...
+```
+
+**5. Crossover evaluation flow**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Crossover Evaluation Flow                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. Candidate trajectory pool (from previous rounds)            │
+│     ├── Trajectory A: RankIC=0.22, direction=0, phase=original  │
+│     ├── Trajectory B: RankIC=0.18, direction=1, phase=original  │
+│     ├── Trajectory C: RankIC=0.25, direction=0, phase=mutation  │
+│     └── Trajectory D: RankIC=0.15, direction=1, phase=mutation  │
+│                                                                  │
+│  2. Filter by parent_selection_strategy                          │
+│     ├── best:                    sort by RankIC desc, take Top-N │
+│     ├── weighted:                higher RankIC = higher weight   │
+│     ├── weighted_inverse:        lower RankIC = higher weight    │
+│     └── top_percent_plus_random: top 30% guaranteed + random    │
+│                                                                  │
+│  3. Generate pairs and score                                     │
+│     ├── Pair [A, C] → score = diversity + avg_metric            │
+│     ├── Pair [A, D] → score = ...                               │
+│     └── ...                                                      │
+│                                                                  │
+│  4. Select Top-N pairs as crossover parents                      │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. Standalone Backtest Framework
+
+### 4.1 Purpose
+
+The backtest inside the main experiment (`factor_backtest`) is designed for rapid single-factor evaluation. The standalone framework (`backtest_v2`) is used for:
+
+1. **Batch evaluation**: uniform backtest across the entire factor library
+2. **Long-horizon validation**: longer test period (2022–2025) to verify factor stability
+3. **Portfolio effect**: assess overall performance of multi-factor combinations
+4. **Benchmarking**: compare against the official Qlib factor library (Alpha158)
+
+### 4.2 Backtest Configuration
+
+```yaml
+# backtest_v2/config.yaml key settings
+
+Data:
+  Source:  ~/.qlib/qlib_data/cn_data
+  Market:  csi300 (CSI 300 constituents)
+  Range:   2016-01-01 ~ 2025-12-26
+
+Dataset splits:
+  Train:      2016-01-01 ~ 2020-12-31  # learn historical patterns
+  Validation: 2021-01-01 ~ 2021-12-31  # hyperparameter tuning
+  Test:       2022-01-01 ~ 2025-12-26  # out-of-sample evaluation
+
+Model:
+  Type:           LightGBM
+  learning_rate:  0.1
+  max_depth:      8
+  num_leaves:     210
+  early_stopping: 50
+  max_iterations: 500
+
+Strategy: TopkDropoutStrategy
+  - topk:   50   # hold top-50 ranked stocks
+  - n_drop: 5    # remove 5 lowest-ranked each rebalance
+
+Transaction costs:
+  Buy:     0.05%
+  Sell:    0.15%
+  Minimum: ¥5
+```
+
+### 4.3 Usage
 
 ```bash
-# 单个因子库回测
+# Single factor library backtest
 python backtest_v2/run_backtest.py \
     -c backtest_v2/config.yaml \
     --factor-source custom \
     --factor-json /path/to/factors.json
 
-# 与 Alpha158 对比
+# Compare against Alpha158
 python backtest_v2/run_backtest.py \
     -c backtest_v2/config.yaml \
     --factor-source alpha158_20
 
-# 批量回测
-./批量回测.sh
+# Batch backtest
+./batch_backtest.sh
 ```
 
-### 4.4 两套回测的区别
+### 4.4 Comparison: Main vs. Standalone Backtest
 
-| 特性 | 主程序内部回测 | 独立回测框架 |
+| Feature | Main program backtest | Standalone framework |
 |------|---------------|--------------|
-| 用途 | 快速评估单因子 | 批量评估因子库 |
-| 回测期 | 2021年（验证集） | 2022-2025（测试集） |
-| 因子数 | 2-3个/轮 | 整个因子库 |
-| 缓存 | 自动缓存到 workspace | 独立缓存目录 |
-| 输出 | 写入因子库 JSON | 独立指标 JSON |
+| Purpose | Rapid single-factor evaluation | Batch evaluation of factor library |
+| Test period | 2021 (validation set) | 2022–2025 (test set) |
+| Factors per run | 2–3 per round | Entire factor library |
+| Caching | Auto-cached to workspace | Separate cache directory |
+| Output | Written to factor library JSON | Standalone metrics JSON |
 
 ---
 
-## 5. 评价指标详解
+## 5. Evaluation Metrics
 
-### 5.1 重要说明：收益指标均为超额收益
+### 5.1 Important Note: All Return Metrics Are Excess Returns
 
-⚠️ **注意**：回测框架输出的收益类指标（`annualized_return`、`max_drawdown` 等）**均为超额收益**，即相对于基准（沪深300指数）的超额表现，而非绝对收益。
+⚠️ **Note**: Return metrics output by the backtest framework (`annualized_return`, `max_drawdown`, etc.) are **all excess returns** — performance relative to the benchmark (CSI 300 Index), not absolute returns.
 
-**计算公式**：
+**Formula**:
 ```python
-超额收益 = 组合收益 - 基准收益 - 交易成本
 excess_return = portfolio_return - bench_return - cost
 ```
 
-所有风险分析指标（年化收益、最大回撤、信息比率等）均基于此超额收益序列计算。
+All risk analysis metrics (annualized return, max drawdown, information ratio, etc.) are computed from this excess return series.
 
-### 5.2 预测能力指标
+### 5.2 Predictive Power Metrics
 
 #### IC (Information Coefficient)
 ```
-定义: 因子值与未来收益的 Pearson 相关系数
-范围: [-1, 1]
-解读:
-  IC > 0.03: 因子有一定预测能力
-  IC > 0.05: 因子预测能力较强
-  IC > 0.10: 因子预测能力很强（罕见）
-  
-计算公式:
+Definition: Pearson correlation between factor values and future returns
+Range: [-1, 1]
+Interpretation:
+  IC > 0.03: factor has some predictive power
+  IC > 0.05: factor has strong predictive power
+  IC > 0.10: factor has very strong predictive power (rare)
+
+Formula:
   IC_t = Corr(Factor_t, Return_{t+1})
-  IC = Mean(IC_t)  # 所有时间的平均
+  IC   = Mean(IC_t)  # averaged over all time periods
 ```
 
 #### ICIR (IC Information Ratio)
 ```
-定义: IC 的均值与标准差之比
-公式: ICIR = Mean(IC) / Std(IC)
-解读:
-  ICIR > 0.5: 因子预测能力稳定
-  ICIR > 1.0: 因子预测能力非常稳定
-  
-意义: IC 高但不稳定的因子可能不如 IC 适中但稳定的因子
+Definition: ratio of IC mean to IC std dev
+Formula: ICIR = Mean(IC) / Std(IC)
+Interpretation:
+  ICIR > 0.5: factor prediction is stable
+  ICIR > 1.0: factor prediction is very stable
+
+Note: a high but unstable IC may be inferior to a moderate but stable one
 ```
 
 #### Rank IC
 ```
-定义: 因子排名与收益排名的 Spearman 相关系数
-优势: 对异常值更鲁棒，更适合实际投资场景
+Definition: Spearman correlation between factor ranks and return ranks
+Advantage: more robust to outliers; better suited for real investment contexts
 ```
 
 #### Rank ICIR
 ```
-定义: Rank IC 的均值与标准差之比
-公式: RankICIR = Mean(RankIC) / Std(RankIC)
+Definition: ratio of Rank IC mean to Rank IC std dev
+Formula: RankICIR = Mean(RankIC) / Std(RankIC)
 ```
 
-### 5.3 收益指标（均为超额收益）
+### 5.3 Return Metrics (All Excess Returns)
 
-#### 超额年化收益率 (Annualized Return)
+#### Excess Annualized Return
 ```
-定义: 策略相对于基准的年化超额收益
-公式: Ann_Excess_Return = (1 + Total_Excess_Return)^(252/Trading_Days) - 1
-示例:
-  0.18 (18%) 表示策略每年跑赢基准 18%
-  
-注意: 此指标已扣除交易成本
-```
+Definition: strategy's annualized excess return relative to benchmark
+Formula: Ann_Excess_Return = (1 + Total_Excess_Return)^(252/Trading_Days) - 1
+Example:
+  0.18 (18%) means the strategy outperforms the benchmark by 18% per year
 
-#### 信息比率 (Information Ratio)
-```
-定义: 超额收益与跟踪误差之比
-公式: IR = Mean(Excess_Return) / Std(Excess_Return) × √252
-解读:
-  IR > 1.0: 策略显著跑赢基准
-  IR > 2.0: 策略表现优异
-  
-意义: 衡量每承担1单位跟踪误差风险，可获得多少超额收益
+Note: transaction costs are already deducted
 ```
 
-#### 超额最大回撤 (Max Drawdown)
+#### Information Ratio
 ```
-定义: 超额收益曲线从历史最高点到最低点的最大跌幅
-公式: MDD = min((Excess_Cumulative_t - Excess_Peak) / Excess_Peak)
-示例:
-  -0.09 (-9%) 表示超额收益最大从高点下跌 9%
-  
-注意: 这是相对于基准的回撤，不是组合绝对回撤
+Definition: excess return divided by tracking error
+Formula: IR = Mean(Excess_Return) / Std(Excess_Return) × √252
+Interpretation:
+  IR > 1.0: strategy significantly outperforms benchmark
+  IR > 2.0: excellent strategy performance
+
+Meaning: excess return earned per unit of tracking error risk
 ```
 
-#### 卡尔玛比率 (Calmar Ratio)
+#### Excess Maximum Drawdown
 ```
-定义: 超额年化收益与超额最大回撤的比值
-公式: Calmar = Ann_Excess_Return / |MDD|
-解读:
-  Calmar > 1.0: 收益风险比较好
-  Calmar > 2.0: 收益风险比优秀
+Definition: largest peak-to-trough decline of the excess return curve
+Formula: MDD = min((Excess_Cumulative_t - Excess_Peak) / Excess_Peak)
+Example:
+  -0.09 (-9%) means excess returns fell at most 9% from peak
+
+Note: this is the drawdown relative to the benchmark, not the absolute portfolio drawdown
 ```
 
-### 5.4 指标解读示例
+#### Calmar Ratio
+```
+Definition: excess annualized return divided by absolute max drawdown
+Formula: Calmar = Ann_Excess_Return / |MDD|
+Interpretation:
+  Calmar > 1.0: decent risk-return ratio
+  Calmar > 2.0: excellent risk-return ratio
+```
 
-以实际回测结果为例（`QA_phase_mutation` 因子库）：
+### 5.4 Example Metric Interpretation
+
+Actual backtest results (`QA_phase_mutation` factor library):
 
 ```json
 {
-  "IC": 0.1277,                    // 非常强的预测能力
-  "ICIR": 0.8738,                  // 预测能力稳定
-  "Rank IC": 0.1242,               // 排名预测能力强
-  "Rank ICIR": 0.8566,             // 排名预测稳定
-  "annualized_return": 0.1827,     // 超额年化收益 18.27%
-  "information_ratio": 2.2588,     // 信息比率 2.26
-  "max_drawdown": -0.0894,         // 超额最大回撤 8.94%
-  "calmar_ratio": 2.0447           // 收益风险比 2.04
+  "IC": 0.1277,                    // Very strong predictive power
+  "ICIR": 0.8738,                  // Stable prediction
+  "Rank IC": 0.1242,               // Strong rank-based predictive power
+  "Rank ICIR": 0.8566,             // Stable rank prediction
+  "annualized_return": 0.1827,     // Excess annualized return 18.27%
+  "information_ratio": 2.2588,     // Information ratio 2.26
+  "max_drawdown": -0.0894,         // Excess max drawdown 8.94%
+  "calmar_ratio": 2.0447           // Calmar ratio 2.04
 }
 ```
 
-**综合评价**：
-- 该因子库在 2022-2025 测试期表现优异
-- IC > 0.12 表明因子组合有很强的收益预测能力
-- **超额年化收益 18.27%**：策略每年平均跑赢沪深300指数 18.27%（已扣除交易成本）
-- **信息比率 2.26**：每承担 1% 的跟踪误差，可获得 2.26% 的超额收益（IR > 2 通常被认为优秀）
-- **超额最大回撤 8.94%**：相对于基准的最大下跌幅度控制在 9% 以内
-- **卡尔玛比率 2.04**：超额收益是最大回撤的 2 倍，风险收益比良好
+**Summary assessment**:
+- This factor library performed excellently over the 2022–2025 test period
+- IC > 0.12 indicates the factor combination has very strong return predictive power
+- **Excess annualized return 18.27%**: strategy outperforms CSI 300 by 18.27% per year on average (after transaction costs)
+- **Information ratio 2.26**: earns 2.26% excess return per 1% of tracking error (IR > 2 is generally considered excellent)
+- **Excess max drawdown 8.94%**: maximum decline relative to benchmark is kept under 9%
+- **Calmar ratio 2.04**: excess return is 2× the max drawdown — a good risk-return profile
 
-### 5.5 与基准对比总结
+### 5.5 Benchmark Comparison Summary
 
-| 指标类型 | 具体指标 | 基准对比方式 |
+| Metric type | Specific metric | How it compares to benchmark |
 |----------|----------|--------------|
-| 预测能力 | IC, ICIR, Rank IC, Rank ICIR | 直接计算因子与收益的相关性 |
-| 收益指标 | annualized_return | **超额**年化 = 组合年化 - 基准年化 - 成本 |
-| 风险指标 | max_drawdown | **超额**收益曲线的最大回撤 |
-| 综合指标 | information_ratio, calmar_ratio | 基于超额收益计算 |
+| Predictive power | IC, ICIR, Rank IC, Rank ICIR | Correlation between factor and returns computed directly |
+| Return | annualized_return | **Excess** annualized = portfolio annualized − benchmark annualized − costs |
+| Risk | max_drawdown | Max drawdown of the **excess** return curve |
+| Combined | information_ratio, calmar_ratio | Computed from excess returns |
 
-**基准设置**：
+**Benchmark settings**:
 ```yaml
-benchmark: SH000300  # 沪深300指数
-market: csi300       # 沪深300成分股
+benchmark: SH000300  # CSI 300 Index
+market: csi300       # CSI 300 constituents
 ```
 
 ---
 
-## 6. 实验配置与超参数
+## 6. Experiment Configuration & Hyperparameters
 
-### 6.1 核心超参数
+### 6.1 Core Hyperparameters
 
-#### 规划阶段 (Planning)
+#### Planning Phase
 ```yaml
 planning:
-  num_directions: 10    # 并行探索方向数
-                        # 越大 → 初始探索越广，但资源消耗越大
-                        # 建议范围: 5-15
+  num_directions: 10    # Number of parallel exploration directions
+                        # Larger → broader initial exploration, but higher resource use
+                        # Recommended: 5–15
 ```
 
-#### 进化阶段 (Evolution)
+#### Evolution Phase
 ```yaml
 evolution:
-  max_rounds: 5         # 最大进化轮数
-                        # 越大 → 探索越深入，但耗时越长
-                        # 建议范围: 3-7
+  max_rounds: 5         # Maximum number of evolution rounds
+                        # Larger → deeper exploration, but longer runtime
+                        # Recommended: 3–7
   
-  crossover_size: 2     # 每次交叉的父代数量
-                        # 2: 两两交叉（最常用）
-                        # 3: 三方交叉（更多样化）
+  crossover_size: 2     # Number of parents per crossover
+                        # 2: pairwise crossover (most common)
+                        # 3: three-way crossover (more diversity)
   
-  crossover_n: 10       # 每轮交叉生成的组合数
-                        # 越大 → 交叉探索越广
-                        # 建议范围: 5-15
+  crossover_n: 10       # Crossover combinations generated per round
+                        # Larger → broader crossover exploration
+                        # Recommended: 5–15
   
-  parent_selection_strategy: best  # 父代选择策略
-                        # best: 优先选择最优轨迹
-                        # weighted: 加权采样（鼓励探索）
-                        # random: 随机选择
+  parent_selection_strategy: best  # Parent selection strategy
+                        # best:     prioritize best trajectories
+                        # weighted: weighted sampling (encourages exploration)
+                        # random:   random selection
 ```
 
-#### 执行阶段 (Execution)
+#### Execution Phase
 ```yaml
 execution:
-  max_loops: 7          # 每条轨迹的最大循环次数
-                        # 总步数 = max_loops × 5
+  max_loops: 7          # Maximum loop iterations per trajectory
+                        # Total steps = max_loops × 5
   
-  steps_per_loop: 5     # 固定为 5（5 步循环）
+  steps_per_loop: 5     # Fixed at 5 (the 5-step cycle)
 ```
 
-### 6.2 配置示例
+### 6.2 Configuration Presets
 
-**探索模式**（广度优先）:
+**Exploration mode** (breadth-first):
 ```yaml
 planning:
   num_directions: 15
@@ -787,7 +848,7 @@ evolution:
   parent_selection_strategy: weighted
 ```
 
-**深度模式**（深度优先）:
+**Deep mode** (depth-first):
 ```yaml
 planning:
   num_directions: 5
@@ -797,7 +858,7 @@ evolution:
   parent_selection_strategy: best
 ```
 
-**平衡模式**（推荐）:
+**Balanced mode** (recommended):
 ```yaml
 planning:
   num_directions: 10
@@ -809,193 +870,193 @@ evolution:
 
 ---
 
-## 7. 数据与回测设置
+## 7. Data & Backtest Settings
 
-### 7.1 数据来源
+### 7.1 Data Source
 
 ```
-数据源: Qlib 中国 A 股数据
-路径: ~/.qlib/qlib_data/cn_data
+Source: Qlib China A-share data
+Path:   ~/.qlib/qlib_data/cn_data
 
-包含:
-- 日线行情: 开盘价、最高价、最低价、收盘价、成交量
-- 市值、估值等基本面数据
-- 沪深300 成分股列表
+Contains:
+- Daily OHLCV: open, high, low, close, volume
+- Fundamental data: market cap, valuation, etc.
+- CSI 300 constituent stock list
 ```
 
-### 7.2 市场设置
+### 7.2 Market Settings
 
 ```yaml
-市场: csi300 (沪深300成分股)
-基准: SH000300 (沪深300指数)
+Market:    csi300   (CSI 300 constituents)
+Benchmark: SH000300 (CSI 300 Index)
 
-选择理由:
-- 流动性好，交易成本低
-- 代表性强，覆盖核心蓝筹
-- 数据质量高，异常值少
+Rationale:
+- Good liquidity, low transaction costs
+- Representative; covers core blue-chip stocks
+- High data quality with few outliers
 ```
 
-### 7.3 时间划分
+### 7.3 Time Split
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│                        时间线                                  │
+│                          Timeline                             │
 ├───────────────────────────────────────────────────────────────┤
 │                                                               │
 │  2016        2020        2021        2022        2025         │
 │    │──────────┼───────────┼───────────┼───────────┤          │
-│    │  训练集   │  验证集    │         测试集         │          │
-│    │  5年     │  1年      │         4年           │          │
+│    │  Train   │  Validate │           Test        │          │
+│    │  5 years │  1 year   │         4 years       │          │
 │    │          │           │                       │          │
-│    │  模型学习  │  调参优化  │    样本外评估（最终）   │          │
-│    │  历史规律  │           │                       │          │
+│    │  Learn   │  Tune     │  Out-of-sample eval   │          │
+│    │  history │           │  (final assessment)   │          │
 │                                                               │
 └───────────────────────────────────────────────────────────────┘
 ```
 
-**设计考量**:
-- **训练集 (2016-2020)**：5 年数据足够模型学习市场规律
-- **验证集 (2021)**：防止过拟合，用于早停和超参调优
-- **测试集 (2022-2025)**：完全样本外，评估真实泛化能力
+**Design rationale**:
+- **Train (2016–2020)**: 5 years of data is sufficient for the model to learn market patterns
+- **Validation (2021)**: prevents overfitting; used for early stopping and hyperparameter tuning
+- **Test (2022–2025)**: completely out-of-sample; evaluates genuine generalization
 
-### 7.4 交易策略
+### 7.4 Trading Strategy
 
 ```yaml
-策略: TopkDropoutStrategy
-参数:
-  topk: 50      # 持有评分最高的 50 只股票
-  n_drop: 5     # 每次调仓剔除评分最低的 5 只
+Strategy: TopkDropoutStrategy
+Parameters:
+  topk:   50   # hold the 50 highest-ranked stocks
+  n_drop: 5    # remove the 5 lowest-ranked stocks each rebalance
 
-逻辑:
-1. 每个交易日，对所有股票计算预测评分
-2. 选择评分最高的 50 只构建组合
-3. 每次调仓时：
-   - 保留原组合中评分仍在 Top50 的股票
-   - 卖出评分最低的 5 只
-   - 买入新进入 Top50 的股票
-4. 等权重持仓
+Logic:
+1. Each trading day, compute predicted scores for all stocks
+2. Build portfolio from the top-50 ranked stocks
+3. At each rebalance:
+   - Retain stocks that remain in the Top 50
+   - Sell the 5 lowest-ranked holdings
+   - Buy newly promoted Top-50 entries
+4. Equal-weight positions
 
-优势:
-- 避免过度交易（只剔除最差的）
-- 保持组合稳定性
-- 降低交易成本
+Advantages:
+- Avoids excessive trading (only removes the worst)
+- Maintains portfolio stability
+- Reduces transaction costs
 ```
 
 ---
 
-## 8. 实验结论与分析
+## 8. Conclusions & Analysis
 
-### 8.1 实验设计总结
+### 8.1 Experiment Design Summary
 
-1. **输入**：用户提供探索方向（如"动量策略"、"价值因子"）
-2. **过程**：
-   - Planning 生成 10 个并行方向
-   - 5 轮进化（原始 → 变异 → 交叉 → 变异 → 交叉）
-   - 每轮 7 次循环，每次生成 2-3 个因子
-3. **输出**：因子库 JSON（包含数百个经过验证的因子）
+1. **Input**: user provides an exploration direction (e.g., "momentum strategy", "value factor")
+2. **Process**:
+   - Planning generates 10 parallel directions
+   - 5 evolution rounds (Original → Mutation → Crossover → Mutation → Crossover)
+   - 7 loops per round, each generating 2–3 factors
+3. **Output**: factor library JSON (hundreds of validated factors)
 
-### 8.2 关键发现
+### 8.2 Key Findings
 
-#### 进化阶段对因子质量的影响
+#### Impact of Evolution Phase on Factor Quality
 
-| 进化阶段 | 因子特点 | 典型表现 |
+| Evolution phase | Factor characteristics | Typical performance |
 |----------|----------|----------|
-| Original | 基础探索 | IC 分布广，包含大量噪声因子 |
-| Mutation | 改进优化 | 在原始基础上针对性改进，IC 略有提升 |
-| Crossover | 组合创新 | 融合多个方向优点，可能产生突破性因子 |
+| Original | Basic exploration | Wide IC distribution; contains many noise factors |
+| Mutation | Targeted improvement | Builds on original trajectories; slight IC improvement |
+| Crossover | Combination innovation | Merges advantages of multiple directions; can yield breakthrough factors |
 
-#### 因子筛选策略
-- **RankIC 排序**：选择预测能力最强的因子
-- **阶段筛选**：不同阶段因子可能有不同特性
-- **随机采样**：验证整体因子库质量
+#### Factor Screening Strategies
+- **Sort by RankIC**: select factors with the strongest predictive power
+- **Phase filtering**: factors from different phases may have different characteristics
+- **Random sampling**: validate overall factor library quality
 
-### 8.3 实践建议
+### 8.3 Practical Recommendations
 
-1. **初次实验**：使用平衡模式配置，运行完整流程
-2. **对比基准**：始终与 Alpha158 进行对比
-3. **多次验证**：不同时间窗口、不同市场验证
-4. **因子筛选**：关注 RankIC > 0.03 且 ICIR > 0.5 的因子
+1. **First run**: use balanced mode configuration and run the full pipeline
+2. **Benchmark comparison**: always compare against Alpha158
+3. **Multiple validations**: validate across different time windows and markets
+4. **Factor screening**: focus on factors with RankIC > 0.03 and ICIR > 0.5
 
-### 8.4 局限性与改进方向
+### 8.4 Limitations & Improvement Directions
 
-| 局限性 | 可能的改进 |
+| Limitation | Possible improvement |
 |--------|-----------|
-| LLM 生成因子可能有偏差 | 增加因子正则化约束 |
-| 回测可能存在过拟合 | 使用更多样本外验证 |
-| 计算资源消耗大 | 优化缓存机制，增量计算 |
-| 交易成本简化 | 考虑更真实的滑点模型 |
+| LLM-generated factors may be biased | Add stronger factor regularization constraints |
+| Backtest may overfit | Use more out-of-sample validation windows |
+| High computational resource consumption | Optimize caching; incremental computation |
+| Simplified transaction costs | Incorporate more realistic slippage models |
 
 ---
 
-## 附录
+## Appendix
 
-### A. 常用命令速查
+### A. Quick Command Reference
 
 ```bash
-# 运行主实验
-./运行实验.sh "你的探索方向"
+# Run main experiment
+./run_experiment.sh "your exploration direction"
 
-# 独立回测
+# Standalone backtest
 python backtest_v2/run_backtest.py -c backtest_v2/config.yaml \
     --factor-source custom \
     --factor-json /path/to/factors.json
 
-# 批量回测
-./批量回测.sh
+# Batch backtest
+./batch_backtest.sh
 
-# 查看因子库
+# View factor library
 python show_all_factors.py
 
-# 清理缓存
-./清理缓存.sh
+# Clear cache
+./clear_cache.sh
 ```
 
-### B. 目录结构
+### B. Directory Structure
 
 ```
-AlphaAgent/                      # Quanta Alpha 主目录
-├── 运行实验.sh                   # 主实验入口
-├── 批量回测.sh                   # 批量回测脚本
-├── 清理缓存.sh                   # 清理缓存脚本
-├── all_factors_library_*.json   # 因子库输出
-├── factor_library/              # 因子库采样
-├── backtest_v2/                 # 独立回测框架
-│   ├── run_backtest.py          # 回测入口
-│   ├── config.yaml              # 回测配置
+AlphaAgent/                      # Quanta Alpha main directory
+├── run_experiment.sh            # Main experiment entry
+├── batch_backtest.sh            # Batch backtest script
+├── clear_cache.sh               # Cache cleanup script
+├── all_factors_library_*.json   # Factor library output
+├── factor_library/              # Factor library samples
+├── backtest_v2/                 # Standalone backtest framework
+│   ├── run_backtest.py          # Backtest entry point
+│   ├── config.yaml              # Backtest config
 │   └── ...
-├── alphaagent/                  # 核心代码
-│   ├── app/                     # 应用入口
-│   │   └── qlib_rd_loop/        # 主循环
+├── alphaagent/                  # Core code
+│   ├── app/                     # Application entry
+│   │   └── qlib_rd_loop/        # Main loop
 │   │       ├── run_config.yaml
 │   │       ├── factor_mining.py
 │   │       └── ...
-│   ├── components/              # 组件
-│   │   ├── workflow/            # 工作流
-│   │   ├── coder/               # 因子编码
-│   │   └── proposal/            # 提案生成
-│   └── scenarios/               # 场景配置
-│       └── qlib/                # Qlib 场景
-└── /mnt/DATA/quantagent/        # 数据存储
+│   ├── components/              # Components
+│   │   ├── workflow/            # Workflow
+│   │   ├── coder/               # Factor coding
+│   │   └── proposal/            # Proposal generation
+│   └── scenarios/               # Scenario configs
+│       └── qlib/                # Qlib scenario
+└── /mnt/DATA/quantagent/        # Data storage
     └── AlphaAgent/
-        ├── factor_cache/        # 因子缓存
-        ├── backtest_v2_results/ # 回测结果
-        └── QuantaAlpha_workspace/  # 工作空间
+        ├── factor_cache/        # Factor cache
+        ├── backtest_v2_results/ # Backtest results
+        └── QuantaAlpha_workspace/  # Workspace
 ```
 
-### C. 指标速查表
+### C. Metric Quick Reference
 
-| 指标 | 中文名 | 类型 | 好的标准 | 说明 |
+| Metric | Full Name | Type | Good Threshold | Description |
 |------|--------|------|----------|------|
-| IC | 信息系数 | 预测能力 | > 0.05 | 因子与收益的相关性 |
-| ICIR | IC信息比 | 预测稳定性 | > 0.5 | IC的稳定程度 |
-| Rank IC | 排名IC | 预测能力 | > 0.05 | 排名相关性，更鲁棒 |
-| Rank ICIR | 排名IC信息比 | 预测稳定性 | > 0.5 | Rank IC的稳定程度 |
-| annualized_return | **超额**年化收益 | 收益 | > 10% | 相对基准的年化超额 |
-| information_ratio | 信息比率 | 风险调整收益 | > 1.0 | 超额收益/跟踪误差 |
-| max_drawdown | **超额**最大回撤 | 风险 | > -15% | 超额收益曲线最大跌幅 |
-| calmar_ratio | 卡尔玛比率 | 风险调整收益 | > 1.0 | 超额年化/\|最大回撤\| |
+| IC | Information Coefficient | Predictive power | > 0.05 | Factor–return correlation |
+| ICIR | IC Information Ratio | Prediction stability | > 0.5 | IC stability |
+| Rank IC | Rank Information Coefficient | Predictive power | > 0.05 | Rank correlation; more robust |
+| Rank ICIR | Rank IC Information Ratio | Prediction stability | > 0.5 | Rank IC stability |
+| annualized_return | **Excess** Annualized Return | Return | > 10% | Excess annualized vs benchmark |
+| information_ratio | Information Ratio | Risk-adjusted return | > 1.0 | Excess return / tracking error |
+| max_drawdown | **Excess** Max Drawdown | Risk | > -15% | Max decline of excess return curve |
+| calmar_ratio | Calmar Ratio | Risk-adjusted return | > 1.0 | Excess annualized / |max drawdown| |
 
-### D. 参考文献
+### D. References
 
 1. Qlib: An AI-oriented Quantitative Investment Platform (Microsoft Research)
 2. LightGBM: A Highly Efficient Gradient Boosting Decision Tree
@@ -1003,6 +1064,6 @@ AlphaAgent/                      # Quanta Alpha 主目录
 
 ---
 
-*文档版本: 1.1*  
-*项目名称: Quanta Alpha*  
-*更新日期: 2026-01-17*
+*Document version: 1.1*  
+*Project: Quanta Alpha*  
+*Updated: 2026-01-17*
